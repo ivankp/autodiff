@@ -11,19 +11,35 @@ namespace ivan::autodiff {
 
 template <typename T, size_t... I>
 struct var {
+  static constexpr size_t nd = sizeof...(I);
+
   T x { };
-  std::array<T,sizeof...(I)> d { };
+  std::array<T,nd> d { };
 
   constexpr var() = default;
-  constexpr var(const T& x) requires(sizeof...(I) == 0)
-  : x(x) { }
-  constexpr var(const T& x) requires(sizeof...(I) == 1)
+  constexpr var(const T& x) requires(nd == 1)
   : x(x), d{1} { }
 
   explicit constexpr operator T() const { return x; }
 
-  template <size_t... J>
-  auto operator<=>(const var<T,J...>& r) const { return x <=> r.x; }
+  template <typename B, size_t... J>
+  auto operator<=>(const var<B,J...>& r) const { return x <=> r.x; }
+  auto operator<=>(const auto& r) const { return x <=> r; }
+};
+
+template <typename T>
+struct var<T> {
+  static constexpr size_t nd = 0;
+
+  T x { };
+
+  constexpr var() = default;
+  constexpr var(const T& x): x(x) { }
+
+  explicit constexpr operator T() const { return x; }
+
+  template <typename B, size_t... J>
+  auto operator<=>(const var<B,J...>& r) const { return x <=> r.x; }
   auto operator<=>(const auto& r) const { return x <=> r; }
 };
 

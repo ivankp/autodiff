@@ -106,5 +106,5 @@ int main(int argc, char** argv) {
 
   TEST( d<0>(abs(mkvar<0>(1.2)*2)) )
 
-  TEST( y < 5 )
+  TEST( x < var(5) )
 }
