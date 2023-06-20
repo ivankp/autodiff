@@ -145,11 +145,11 @@ constexpr auto NAME( const A& a, const var<B,J...>& b ) { \
 #define BINARY_F \
   static auto f(const auto& a, const auto& b)
 #define BINARY_DFDA \
-  template <size_t K> \
-  static auto dfda(const auto& a, const auto& b, const auto& v)
+  template <size_t K, typename V> \
+  static auto dfda(const auto& a, const auto& b, const V& v)
 #define BINARY_DFDB \
-  template <size_t K> \
-  static auto dfdb(const auto& a, const auto& b, const auto& v)
+  template <size_t K, typename V> \
+  static auto dfdb(const auto& a, const auto& b, const V& v)
 
 // ------------------------------------------------------------------
 
@@ -296,6 +296,22 @@ struct unary_cos_impl {
   UNARY_DFDA { using std::sin; return -sin(a.x) * d<K>(a); }
 };
 IVAN_AUTODIFF_MAKE_UNARY_OP(cos,unary_cos_impl)
+
+// ------------------------------------------------------------------
+
+template <typename,typename>
+struct binary_pow_impl {
+  BINARY_F { using std::pow; return pow(a,b); }
+  BINARY_DFDA -> V {
+    if (a.x == 0) return { };
+    return v * b.x * d<K>(a) / a.x;
+  }
+  BINARY_DFDB -> V {
+    using std::log;
+    return v * log(a.x) * d<K>(b);
+  }
+};
+IVAN_AUTODIFF_MAKE_BINARY_OP(pow,binary_pow_impl)
 
 // ------------------------------------------------------------------
 

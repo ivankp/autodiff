@@ -96,4 +96,11 @@ int main(int argc, char** argv) {
   sum /= ( 4*x + 2 );
   TEST( sum )
   TEST( sum.d[0] )
+
+  TEST( pow(x,cy) )
+  TEST( pow(x,cy).d[0] )
+
+  TEST( pow(mkvar<0>(-1),y) )
+  TEST( d<0>(pow(mkvar<0>(-1),y)) )
+  TEST( d<1>(pow(-1,y)) )
 }
