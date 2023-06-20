@@ -95,7 +95,7 @@ constexpr auto unary_op( const var<A,I...>& a ) {
 #define IVAN_AUTODIFF_MAKE_UNARY_OP(NAME,IMPL) \
 template <typename A, size_t... I> \
 constexpr auto NAME( const var<A,I...>& a ) { \
-  return unary_op<IMPL>(a); \
+  return unary_op<IMPL<A>>(a); \
 }
 
 #define UNARY_F \
@@ -131,7 +131,7 @@ constexpr auto binary_op( const var<A,I...>& a, const var<B,J...>& b ) {
 #define IVAN_AUTODIFF_MAKE_BINARY_OP(NAME,IMPL) \
 template <typename A, typename B, size_t... I, size_t... J> \
 constexpr auto NAME( const var<A,I...>& a, const var<B,J...>& b ) { \
-  return binary_op<IMPL>(a,b); \
+  return binary_op<IMPL<A,B>>(a,b); \
 } \
 template <typename A, typename B, size_t... I> \
 constexpr auto NAME( const var<A,I...>& a, const B& b ) { \
@@ -153,6 +153,7 @@ constexpr auto NAME( const A& a, const var<B,J...>& b ) { \
 
 // ------------------------------------------------------------------
 
+template <typename>
 struct unary_minus_impl {
   UNARY_F { return -a; }
   UNARY_DFDA { return -d<K>(a); }
@@ -161,6 +162,7 @@ IVAN_AUTODIFF_MAKE_UNARY_OP(operator-,unary_minus_impl)
 
 // ------------------------------------------------------------------
 
+template <typename,typename>
 struct binary_plus_impl {
   BINARY_F { return a + b; }
   BINARY_DFDA { return d<K>(a); }
@@ -168,6 +170,7 @@ struct binary_plus_impl {
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator+,binary_plus_impl)
 
+template <typename,typename>
 struct binary_minus_impl {
   BINARY_F { return a - b; }
   BINARY_DFDA { return d<K>(a); }
@@ -175,6 +178,7 @@ struct binary_minus_impl {
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator-,binary_minus_impl)
 
+template <typename,typename>
 struct binary_mult_impl {
   BINARY_F { return a * b; }
   BINARY_DFDA { return d<K>(a) * b.x; }
@@ -182,6 +186,7 @@ struct binary_mult_impl {
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator*,binary_mult_impl)
 
+template <typename,typename>
 struct binary_div_impl {
   BINARY_F { return a / b; }
   BINARY_DFDA { return d<K>(a) / b.x; }
@@ -191,17 +196,33 @@ IVAN_AUTODIFF_MAKE_BINARY_OP(operator/,binary_div_impl)
 
 // ------------------------------------------------------------------
 
+template <typename>
 struct unary_exp_impl {
   UNARY_F { using std::exp; return exp(a); }
   UNARY_DFDA { return v * d<K>(a); }
 };
 IVAN_AUTODIFF_MAKE_UNARY_OP(exp,unary_exp_impl)
 
+template <typename>
 struct unary_log_impl {
   UNARY_F { using std::log; return log(a); }
   UNARY_DFDA { return d<K>(a)/a.x; }
 };
 IVAN_AUTODIFF_MAKE_UNARY_OP(log,unary_log_impl)
+
+template <typename>
+struct unary_sin_impl {
+  UNARY_F { using std::sin; return sin(a); }
+  UNARY_DFDA { using std::cos; return cos(a.x) * d<K>(a); }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(sin,unary_sin_impl)
+
+template <typename>
+struct unary_cos_impl {
+  UNARY_F { using std::cos; return cos(a); }
+  UNARY_DFDA { using std::sin; return -sin(a.x) * d<K>(a); }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(cos,unary_cos_impl)
 
 // ------------------------------------------------------------------
 
