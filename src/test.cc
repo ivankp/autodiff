@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
 
   var<double,0> x(3);
   var<double,1> y(5);
+  var<double> cy(5);
 
   TEST( d<1>(y) )
 
@@ -50,4 +51,14 @@ int main(int argc, char** argv) {
   TEST(( (x+1)*y ))
   TEST(( (x+1)*y ).d[0])
   TEST(( (x+1)*y ).d[1])
+
+  TEST(((x*cy)+cy))
+  TEST(((x*cy)+cy).d[0])
+
+  TEST(( (x+1)*cy ))
+  TEST(( (x+1)*cy ).d[0])
+
+  TEST(((x*y)/y))
+  TEST(((x*y)/y).d[0])
+  TEST(((x*y)/y).d[1])
 }

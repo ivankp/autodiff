@@ -86,7 +86,7 @@ constexpr auto unary_op( const var<A,I...>& a ) {
   v.x = OP::f(a.x);
   [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
     ([&]<size_t K>(index_constant<K>){
-      d<K>(v) = OP::template df<K>(a);
+      d<K>(v) = OP::template dfda<K>(a);
     }(index_constant<Ks>{}), ... );
   }(var_sentinel<decltype(v)>{});
   return v;
@@ -143,6 +143,15 @@ struct binary_plus_impl {
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator+,binary_plus_impl)
 
+struct binary_minus_impl {
+  static auto f(const auto& a, const auto& b) { return a - b; }
+  template <size_t K>
+  static auto dfda(const auto& a, const auto& b) { return d<K>(a); }
+  template <size_t K>
+  static auto dfdb(const auto& a, const auto& b) { return -d<K>(b); }
+};
+IVAN_AUTODIFF_MAKE_BINARY_OP(operator-,binary_minus_impl)
+
 struct binary_mult_impl {
   static auto f(const auto& a, const auto& b) { return a * b; }
   template <size_t K>
@@ -151,6 +160,15 @@ struct binary_mult_impl {
   static auto dfdb(const auto& a, const auto& b) { return d<K>(b) * a.x; }
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator*,binary_mult_impl)
+
+struct binary_div_impl {
+  static auto f(const auto& a, const auto& b) { return a / b; }
+  template <size_t K>
+  static auto dfda(const auto& a, const auto& b) { return d<K>(a) / b.x; }
+  template <size_t K>
+  static auto dfdb(const auto& a, const auto& b) { return - d<K>(b) * (a.x / (b.x*b.x)); }
+};
+IVAN_AUTODIFF_MAKE_BINARY_OP(operator/,binary_div_impl)
 
 struct unary_log_impl {
   static auto f(const auto& a) { using std::log; return log(a); }
