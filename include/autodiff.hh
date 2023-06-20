@@ -75,73 +75,89 @@ constexpr auto index_set(auto apply) {
 }
 
 // ------------------------------------------------------------------
-template <typename A, typename B, size_t... I>
-constexpr auto operator+( const var<A,I...>& a, const B& b ) {
-  return a + var(b);
-}
-template <typename A, typename B, size_t... J>
-constexpr auto operator+( const A& a, const var<B,J...>& b ) {
-  return var(a) + b;
-}
-template <typename A, typename B, size_t... I, size_t... J>
-constexpr auto operator+( const var<A,I...>& a, const var<B,J...>& b ) {
-  using T = decltype( a.x + b.x );
-  using result_t = decltype(index_set<I...,J...>(
-    []<size_t... K>(std::index_sequence<K...>) {
-      return var<T,K...>{};
-    }
-  ));
-  result_t v;
-  v.x = a.x + b.x;
-  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
-    ([&]<size_t K>(index_constant<K>){
-      if constexpr (in<K,I...>) d<K>(v) += d<K>(a);
-      if constexpr (in<K,J...>) d<K>(v) += d<K>(b);
-    }(index_constant<Ks>{}), ... );
-  }(var_sentinel<decltype(v)>{});
-  return v;
-}
 
-template <typename A, typename B, size_t... I>
-constexpr auto operator*( const var<A,I...>& a, const B& b ) {
-  return a * var(b);
-}
-template <typename A, typename B, size_t... J>
-constexpr auto operator*( const A& a, const var<B,J...>& b ) {
-  return var(a) * b;
-}
-template <typename A, typename B, size_t... I, size_t... J>
-constexpr auto operator*( const var<A,I...>& a, const var<B,J...>& b ) {
-  using T = decltype( a.x * b.x );
-  using result_t = decltype(index_set<I...,J...>(
-    []<size_t... K>(std::index_sequence<K...>) {
-      return var<T,K...>{};
-    }
-  ));
-  result_t v;
-  v.x = a.x * b.x;
-  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
-    ([&]<size_t K>(index_constant<K>){
-      if constexpr (in<K,I...>) d<K>(v) += d<K>(a) * b.x;
-      if constexpr (in<K,J...>) d<K>(v) += d<K>(b) * a.x;
-    }(index_constant<Ks>{}), ... );
-  }(var_sentinel<decltype(v)>{});
-  return v;
-}
-
-template <typename A, size_t... I>
-constexpr auto log( const var<A,I...>& a ) {
-  using std::log;
-  using T = decltype( log(a.x) );
+template <
+  typename OP,
+  typename A, size_t... I
+>
+constexpr auto unary_op( const var<A,I...>& a ) {
+  using T = decltype( OP::f(a.x) );
   var<T,I...> v;
-  v.x = log(a.x);
+  v.x = OP::f(a.x);
   [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
     ([&]<size_t K>(index_constant<K>){
-      d<K>(v) += d<K>(a) / a.x;
+      d<K>(v) = OP::template df<K>(a);
     }(index_constant<Ks>{}), ... );
   }(var_sentinel<decltype(v)>{});
   return v;
 }
+
+#define IVAN_AUTODIFF_MAKE_UNARY_OP(NAME,IMPL) \
+template <typename A, size_t... I> \
+constexpr auto NAME( const var<A,I...>& a ) { \
+  return unary_op<IMPL>(a); \
+}
+
+template <
+  typename OP,
+  typename A, typename B, size_t... I, size_t... J
+>
+constexpr auto binary_op( const var<A,I...>& a, const var<B,J...>& b ) {
+  using T = decltype( OP::f(a.x,b.x) );
+  using result_t = decltype(index_set<I...,J...>(
+    []<size_t... K>(std::index_sequence<K...>) {
+      return var<T,K...>{};
+    }
+  ));
+  result_t v;
+  v.x = OP::f(a.x,b.x);
+  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
+    ([&]<size_t K>(index_constant<K>){
+      if constexpr (in<K,I...>) d<K>(v) += OP::template dfda<K>(a,b);
+      if constexpr (in<K,J...>) d<K>(v) += OP::template dfdb<K>(a,b);
+    }(index_constant<Ks>{}), ... );
+  }(var_sentinel<decltype(v)>{});
+  return v;
+}
+
+#define IVAN_AUTODIFF_MAKE_BINARY_OP(NAME,IMPL) \
+template <typename A, typename B, size_t... I, size_t... J> \
+constexpr auto NAME( const var<A,I...>& a, const var<B,J...>& b ) { \
+  return binary_op<IMPL>(a,b); \
+} \
+template <typename A, typename B, size_t... I> \
+constexpr auto NAME( const var<A,I...>& a, const B& b ) { \
+  return NAME(a,var(b)); \
+} \
+template <typename A, typename B, size_t... J> \
+constexpr auto NAME( const A& a, const var<B,J...>& b ) { \
+  return NAME(var(a),b); \
+}
+
+struct binary_plus_impl {
+  static auto f(const auto& a, const auto& b) { return a + b; }
+  template <size_t K>
+  static auto dfda(const auto& a, const auto& b) { return d<K>(a); }
+  template <size_t K>
+  static auto dfdb(const auto& a, const auto& b) { return d<K>(b); }
+};
+IVAN_AUTODIFF_MAKE_BINARY_OP(operator+,binary_plus_impl)
+
+struct binary_mult_impl {
+  static auto f(const auto& a, const auto& b) { return a * b; }
+  template <size_t K>
+  static auto dfda(const auto& a, const auto& b) { return d<K>(a) * b.x; }
+  template <size_t K>
+  static auto dfdb(const auto& a, const auto& b) { return d<K>(b) * a.x; }
+};
+IVAN_AUTODIFF_MAKE_BINARY_OP(operator*,binary_mult_impl)
+
+struct unary_log_impl {
+  static auto f(const auto& a) { using std::log; return log(a); }
+  template <size_t K>
+  static auto dfda(const auto& a) { return d<K>(a)/a.x; }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(log,unary_log_impl)
 
 // ------------------------------------------------------------------
 
