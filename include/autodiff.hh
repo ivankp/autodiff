@@ -158,10 +158,10 @@ template <
   typename A, typename B, size_t... I, size_t... J
 >
 constexpr auto& accumulator_op( var<A,I...>& a, const var<B,J...>& b ) {
-  ([&]<size_t K>(index_constant<K>){
-    OP::template dfda<K>(a,b);
-    if constexpr (in<K,J...>) OP::template dfdb<K>(a,b);
-  }(index_constant<I>{}), ... );
+  ([&]{
+    OP::template dfda<I>(a,b);
+    if constexpr (in<I,J...>) OP::template dfdb<I>(a,b);
+  }(), ... );
   OP::f(a.x,b.x);
   return a;
 }
@@ -213,9 +213,9 @@ IVAN_AUTODIFF_MAKE_BINARY_OP(operator+,binary_plus_impl)
 
 template <typename,typename>
 struct accumulator_plus_impl {
-  ACCUMULATOR_F { return a += b; }
   ACCUMULATOR_DFDA { }
   ACCUMULATOR_DFDB { d<K>(a) += d<K>(b); }
+  ACCUMULATOR_F { a += b; }
 };
 IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator+=,accumulator_plus_impl)
 
@@ -229,9 +229,9 @@ IVAN_AUTODIFF_MAKE_BINARY_OP(operator-,binary_minus_impl)
 
 template <typename,typename>
 struct accumulator_minus_impl {
-  ACCUMULATOR_F { return a -= b; }
   ACCUMULATOR_DFDA { }
   ACCUMULATOR_DFDB { d<K>(a) -= d<K>(b); }
+  ACCUMULATOR_F { a -= b; }
 };
 IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator-=,accumulator_minus_impl)
 
@@ -245,9 +245,9 @@ IVAN_AUTODIFF_MAKE_BINARY_OP(operator*,binary_mult_impl)
 
 template <typename,typename>
 struct accumulator_mult_impl {
-  ACCUMULATOR_F { return a *= b; }
   ACCUMULATOR_DFDA { d<K>(a) *= b.x; }
   ACCUMULATOR_DFDB { d<K>(a) += d<K>(b) * a.x; }
+  ACCUMULATOR_F { a *= b; }
 };
 IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator*=,accumulator_mult_impl)
 
@@ -261,9 +261,9 @@ IVAN_AUTODIFF_MAKE_BINARY_OP(operator/,binary_div_impl)
 
 template <typename,typename>
 struct accumulator_div_impl {
-  ACCUMULATOR_F { return a /= b; }
   ACCUMULATOR_DFDA { d<K>(a) /= b.x; }
   ACCUMULATOR_DFDB { d<K>(a) -= d<K>(b) * (a.x / (b.x*b.x)); }
+  ACCUMULATOR_F { a /= b; }
 };
 IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator/=,accumulator_div_impl)
 
