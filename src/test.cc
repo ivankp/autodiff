@@ -61,4 +61,7 @@ int main(int argc, char** argv) {
   TEST(((x*y)/y))
   TEST(((x*y)/y).d[0])
   TEST(((x*y)/y).d[1])
+
+  TEST(( -(x+1) ))
+  TEST(( -(x+1) ).d[0])
 }

@@ -86,7 +86,7 @@ constexpr auto unary_op( const var<A,I...>& a ) {
   v.x = OP::f(a.x);
   [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
     ([&]<size_t K>(index_constant<K>){
-      d<K>(v) = OP::template dfda<K>(a);
+      d<K>(v) = OP::template dfda<K>(a,v.x);
     }(index_constant<Ks>{}), ... );
   }(var_sentinel<decltype(v)>{});
   return v;
@@ -97,6 +97,14 @@ template <typename A, size_t... I> \
 constexpr auto NAME( const var<A,I...>& a ) { \
   return unary_op<IMPL>(a); \
 }
+
+#define UNARY_F \
+  static auto f(const auto& a)
+#define UNARY_DFDA \
+  template <size_t K> \
+  static auto dfda(const auto& a, const auto& v)
+
+// ------------------------------------------------------------------
 
 template <
   typename OP,
@@ -113,8 +121,8 @@ constexpr auto binary_op( const var<A,I...>& a, const var<B,J...>& b ) {
   v.x = OP::f(a.x,b.x);
   [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
     ([&]<size_t K>(index_constant<K>){
-      if constexpr (in<K,I...>) d<K>(v) += OP::template dfda<K>(a,b);
-      if constexpr (in<K,J...>) d<K>(v) += OP::template dfdb<K>(a,b);
+      if constexpr (in<K,I...>) d<K>(v) += OP::template dfda<K>(a,b,v.x);
+      if constexpr (in<K,J...>) d<K>(v) += OP::template dfdb<K>(a,b,v.x);
     }(index_constant<Ks>{}), ... );
   }(var_sentinel<decltype(v)>{});
   return v;
@@ -134,46 +142,64 @@ constexpr auto NAME( const A& a, const var<B,J...>& b ) { \
   return NAME(var(a),b); \
 }
 
+#define BINARY_F \
+  static auto f(const auto& a, const auto& b)
+#define BINARY_DFDA \
+  template <size_t K> \
+  static auto dfda(const auto& a, const auto& b, const auto& v)
+#define BINARY_DFDB \
+  template <size_t K> \
+  static auto dfdb(const auto& a, const auto& b, const auto& v)
+
+// ------------------------------------------------------------------
+
+struct unary_minus_impl {
+  UNARY_F { return -a; }
+  UNARY_DFDA { return -d<K>(a); }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(operator-,unary_minus_impl)
+
+// ------------------------------------------------------------------
+
 struct binary_plus_impl {
-  static auto f(const auto& a, const auto& b) { return a + b; }
-  template <size_t K>
-  static auto dfda(const auto& a, const auto& b) { return d<K>(a); }
-  template <size_t K>
-  static auto dfdb(const auto& a, const auto& b) { return d<K>(b); }
+  BINARY_F { return a + b; }
+  BINARY_DFDA { return d<K>(a); }
+  BINARY_DFDB { return d<K>(b); }
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator+,binary_plus_impl)
 
 struct binary_minus_impl {
-  static auto f(const auto& a, const auto& b) { return a - b; }
-  template <size_t K>
-  static auto dfda(const auto& a, const auto& b) { return d<K>(a); }
-  template <size_t K>
-  static auto dfdb(const auto& a, const auto& b) { return -d<K>(b); }
+  BINARY_F { return a - b; }
+  BINARY_DFDA { return d<K>(a); }
+  BINARY_DFDB { return -d<K>(b); }
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator-,binary_minus_impl)
 
 struct binary_mult_impl {
-  static auto f(const auto& a, const auto& b) { return a * b; }
-  template <size_t K>
-  static auto dfda(const auto& a, const auto& b) { return d<K>(a) * b.x; }
-  template <size_t K>
-  static auto dfdb(const auto& a, const auto& b) { return d<K>(b) * a.x; }
+  BINARY_F { return a * b; }
+  BINARY_DFDA { return d<K>(a) * b.x; }
+  BINARY_DFDB { return d<K>(b) * a.x; }
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator*,binary_mult_impl)
 
 struct binary_div_impl {
-  static auto f(const auto& a, const auto& b) { return a / b; }
-  template <size_t K>
-  static auto dfda(const auto& a, const auto& b) { return d<K>(a) / b.x; }
-  template <size_t K>
-  static auto dfdb(const auto& a, const auto& b) { return - d<K>(b) * (a.x / (b.x*b.x)); }
+  BINARY_F { return a / b; }
+  BINARY_DFDA { return d<K>(a) / b.x; }
+  BINARY_DFDB { return - d<K>(b) * (a.x / (b.x*b.x)); }
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator/,binary_div_impl)
 
+// ------------------------------------------------------------------
+
+struct unary_exp_impl {
+  UNARY_F { using std::exp; return exp(a); }
+  UNARY_DFDA { return v * d<K>(a); }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(exp,unary_exp_impl)
+
 struct unary_log_impl {
-  static auto f(const auto& a) { using std::log; return log(a); }
-  template <size_t K>
-  static auto dfda(const auto& a) { return d<K>(a)/a.x; }
+  UNARY_F { using std::log; return log(a); }
+  UNARY_DFDA { return d<K>(a)/a.x; }
 };
 IVAN_AUTODIFF_MAKE_UNARY_OP(log,unary_log_impl)
 
