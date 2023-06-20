@@ -3,7 +3,7 @@
 
 #include <array>
 #include <utility>
-#include <type_traits>
+// #include <type_traits>
 #include <algorithm>
 #include <cmath>
 
@@ -321,7 +321,8 @@ template <typename,typename>
 struct binary_pow_impl {
   BINARY_F { using std::pow; return pow(a,b); }
   BINARY_DFDA -> V {
-    if (a.x == 0) return { };
+    if constexpr (requires { a.x == 0; })
+      if (a.x == 0) return 0;
     return v * b.x * d<K>(a) / a.x;
   }
   BINARY_DFDB -> V {
