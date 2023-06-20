@@ -103,4 +103,8 @@ int main(int argc, char** argv) {
   TEST( pow(mkvar<0>(-1),y) )
   TEST( d<0>(pow(mkvar<0>(-1),y)) )
   TEST( d<1>(pow(-1,y)) )
+
+  TEST( d<0>(abs(mkvar<0>(1.2)*2)) )
+
+  TEST( y < 5 )
 }

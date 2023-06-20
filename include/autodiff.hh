@@ -21,6 +21,10 @@ struct var {
   : x(x), d{1} { }
 
   explicit constexpr operator T() const { return x; }
+
+  template <size_t... J>
+  auto operator<=>(const var<T,J...>& r) const { return x <=> r.x; }
+  auto operator<=>(const auto& r) const { return x <=> r; }
 };
 
 template <typename T>
@@ -177,13 +181,13 @@ constexpr auto NAME( var<A,I...>& a, const B& b ) { \
 }
 
 #define ACCUMULATOR_F \
-  static auto f(auto& a, const auto& b)
+  static void f(auto& a, const auto& b)
 #define ACCUMULATOR_DFDA \
   template <size_t K> \
-  static auto dfda(auto& a, const auto& b)
+  static void dfda(auto& a, const auto& b)
 #define ACCUMULATOR_DFDB \
   template <size_t K> \
-  static auto dfdb(auto& a, const auto& b)
+  static void dfdb(auto& a, const auto& b)
 
 // ------------------------------------------------------------------
 
@@ -282,6 +286,20 @@ struct unary_log_impl {
   UNARY_DFDA { return d<K>(a)/a.x; }
 };
 IVAN_AUTODIFF_MAKE_UNARY_OP(log,unary_log_impl)
+
+template <typename>
+struct unary_abs_impl {
+  UNARY_F { using std::abs; return abs(a); }
+  UNARY_DFDA { return a.x < 0 ? -d<K>(a) : d<K>(a); }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(abs,unary_abs_impl)
+
+template <typename>
+struct unary_sqrt_impl {
+  UNARY_F { using std::sqrt; return sqrt(a); }
+  UNARY_DFDA { return d<K>(a)/(v*2); }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(sqrt,unary_sqrt_impl)
 
 template <typename>
 struct unary_sin_impl {
