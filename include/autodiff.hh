@@ -51,9 +51,7 @@ constexpr var<T,I> mkvar(T x) { return { x }; }
 
 // ------------------------------------------------------------------
 
-template <typename> struct var_sentinel;
-template <typename T, size_t... I> struct var_sentinel<var<T,I...>> { };
-
+template <typename> struct type_constant { };
 template <size_t> struct index_constant { };
 
 template <size_t J, size_t... I>
@@ -104,11 +102,9 @@ constexpr auto unary_op( const var<A,I...>& a ) {
   using T = decltype( OP::f(a.x) );
   var<T,I...> v;
   v.x = OP::f(a.x);
-  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
-    ([&]<size_t K>(index_constant<K>){
-      d<K>(v) = OP::template dfda<K>(a,v.x);
-    }(index_constant<Ks>{}), ... );
-  }(var_sentinel<decltype(v)>{});
+  ([&]{
+    d<I>(v) = OP::template dfda<I>(a,v.x);
+  }(), ... );
   return v;
 }
 
@@ -139,12 +135,12 @@ constexpr auto binary_op( const var<A,I...>& a, const var<B,J...>& b ) {
   ));
   result_t v;
   v.x = OP::f(a.x,b.x);
-  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
+  [&]<size_t... Ks>(type_constant<var<T,Ks...>>) {
     ([&]<size_t K>(index_constant<K>){
       if constexpr (in<K,I...>) d<K>(v) += OP::template dfda<K>(a,b,v.x);
       if constexpr (in<K,J...>) d<K>(v) += OP::template dfdb<K>(a,b,v.x);
     }(index_constant<Ks>{}), ... );
-  }(var_sentinel<decltype(v)>{});
+  }(type_constant<decltype(v)>{});
   return v;
 }
 
