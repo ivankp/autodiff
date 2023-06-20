@@ -60,7 +60,7 @@ T d(const var<T,I...>& v) requires (!in<J,I...>) {
 // ------------------------------------------------------------------
 
 template <size_t... I>
-constexpr auto index_set(auto apply) {
+constexpr auto unique_indices(auto apply) {
   constexpr auto arr_size = []{
     std::array<size_t,sizeof...(I)> arr { I... };
     std::sort( arr.begin(), arr.end() );
@@ -112,7 +112,7 @@ template <
 >
 constexpr auto binary_op( const var<A,I...>& a, const var<B,J...>& b ) {
   using T = decltype( OP::f(a.x,b.x) );
-  using result_t = decltype(index_set<I...,J...>(
+  using result_t = decltype(unique_indices<I...,J...>(
     []<size_t... K>(std::index_sequence<K...>) {
       return var<T,K...>{};
     }
@@ -153,12 +153,53 @@ constexpr auto NAME( const A& a, const var<B,J...>& b ) { \
 
 // ------------------------------------------------------------------
 
+template <
+  typename OP,
+  typename A, typename B, size_t... I, size_t... J
+>
+constexpr auto& accumulator_op( var<A,I...>& a, const var<B,J...>& b ) {
+  ([&]<size_t K>(index_constant<K>){
+    OP::template dfda<K>(a,b);
+    if constexpr (in<K,J...>) OP::template dfdb<K>(a,b);
+  }(index_constant<I>{}), ... );
+  OP::f(a.x,b.x);
+  return a;
+}
+
+#define IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(NAME,IMPL) \
+template <typename A, typename B, size_t... I, size_t... J> \
+constexpr auto NAME( var<A,I...>& a, const var<B,J...>& b ) { \
+  return accumulator_op<IMPL<A,B>>(a,b); \
+} \
+template <typename A, typename B, size_t... I> \
+constexpr auto NAME( var<A,I...>& a, const B& b ) { \
+  return NAME(a,var(b)); \
+}
+
+#define ACCUMULATOR_F \
+  static auto f(auto& a, const auto& b)
+#define ACCUMULATOR_DFDA \
+  template <size_t K> \
+  static auto dfda(auto& a, const auto& b)
+#define ACCUMULATOR_DFDB \
+  template <size_t K> \
+  static auto dfdb(auto& a, const auto& b)
+
+// ------------------------------------------------------------------
+
 template <typename>
 struct unary_minus_impl {
   UNARY_F { return -a; }
   UNARY_DFDA { return -d<K>(a); }
 };
 IVAN_AUTODIFF_MAKE_UNARY_OP(operator-,unary_minus_impl)
+
+template <typename>
+struct unary_plus_impl {
+  UNARY_F { return +a; }
+  UNARY_DFDA { return +d<K>(a); }
+};
+IVAN_AUTODIFF_MAKE_UNARY_OP(operator+,unary_plus_impl)
 
 // ------------------------------------------------------------------
 
@@ -171,12 +212,28 @@ struct binary_plus_impl {
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator+,binary_plus_impl)
 
 template <typename,typename>
+struct accumulator_plus_impl {
+  ACCUMULATOR_F { return a += b; }
+  ACCUMULATOR_DFDA { }
+  ACCUMULATOR_DFDB { d<K>(a) += d<K>(b); }
+};
+IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator+=,accumulator_plus_impl)
+
+template <typename,typename>
 struct binary_minus_impl {
   BINARY_F { return a - b; }
   BINARY_DFDA { return d<K>(a); }
   BINARY_DFDB { return -d<K>(b); }
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator-,binary_minus_impl)
+
+template <typename,typename>
+struct accumulator_minus_impl {
+  ACCUMULATOR_F { return a -= b; }
+  ACCUMULATOR_DFDA { }
+  ACCUMULATOR_DFDB { d<K>(a) -= d<K>(b); }
+};
+IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator-=,accumulator_minus_impl)
 
 template <typename,typename>
 struct binary_mult_impl {
@@ -187,12 +244,28 @@ struct binary_mult_impl {
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator*,binary_mult_impl)
 
 template <typename,typename>
+struct accumulator_mult_impl {
+  ACCUMULATOR_F { return a *= b; }
+  ACCUMULATOR_DFDA { d<K>(a) *= b.x; }
+  ACCUMULATOR_DFDB { d<K>(a) += d<K>(b) * a.x; }
+};
+IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator*=,accumulator_mult_impl)
+
+template <typename,typename>
 struct binary_div_impl {
   BINARY_F { return a / b; }
   BINARY_DFDA { return d<K>(a) / b.x; }
   BINARY_DFDB { return - d<K>(b) * (a.x / (b.x*b.x)); }
 };
 IVAN_AUTODIFF_MAKE_BINARY_OP(operator/,binary_div_impl)
+
+template <typename,typename>
+struct accumulator_div_impl {
+  ACCUMULATOR_F { return a /= b; }
+  ACCUMULATOR_DFDA { d<K>(a) /= b.x; }
+  ACCUMULATOR_DFDB { d<K>(a) -= d<K>(b) * (a.x / (b.x*b.x)); }
+};
+IVAN_AUTODIFF_MAKE_ACCUMULATOR_OP(operator/=,accumulator_div_impl)
 
 // ------------------------------------------------------------------
 

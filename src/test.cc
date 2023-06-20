@@ -64,4 +64,36 @@ int main(int argc, char** argv) {
 
   TEST(( -(x+1) ))
   TEST(( -(x+1) ).d[0])
+
+  TEST(( sin( mkvar<0>(M_PI/2) ) ))
+  TEST(( d<0>(sin( mkvar<0>(M_PI/2) )) ))
+
+  TEST(( cos( mkvar<0>(M_PI/2) ) ))
+  TEST(( d<0>(cos( mkvar<0>(M_PI/2) )) ))
+
+  auto sum = x;
+  TEST( sum )
+  TEST( sum.d[0] )
+  sum += x;
+  TEST( sum )
+  TEST( sum.d[0] )
+  sum += x;
+  TEST( sum )
+  TEST( sum.d[0] )
+  sum += 1;
+  TEST( sum )
+  TEST( sum.d[0] )
+  sum -= x;
+  TEST( sum )
+  TEST( sum.d[0] )
+  sum *= 2;
+  TEST( sum )
+  TEST( sum.d[0] )
+  sum *= x;
+  TEST( sum )
+  TEST( sum.d[0] )
+
+  sum /= ( 4*x + 2 );
+  TEST( sum )
+  TEST( sum.d[0] )
 }
