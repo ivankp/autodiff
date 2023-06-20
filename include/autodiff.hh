@@ -22,23 +22,58 @@ struct var {
 
   explicit constexpr operator T() const { return x; }
 
-  template <size_t J>
-  static constexpr bool has = ( (I == J) || ... );
+  // template <size_t J>
+  // static constexpr bool in = ( (I == J) || ... );
+  //
+  // template <size_t J>
+  // static constexpr size_t index = in<J> ? ( (I < J) + ... ) : size_t(-1);
 
-  template <size_t J>
-  static constexpr size_t index = has<J> ? ( (I < J) + ... ) : size_t(-1);
-
-  template <size_t J> requires ( has<J> )
-  auto& get() noexcept { return d[index<J>]; }
-  template <size_t J> requires ( has<J> )
-  const auto& get() const noexcept { return d[index<J>]; }
-
-  void compute_derivatives(auto&& f) {
-    [&]<size_t... Ks>(std::index_sequence<Ks...>) {
-      ( f(std::index_sequence<Ks>{}), ... );
-    }(std::index_sequence<I...>{});
-  };
+  // void compute_derivatives(auto&& f) {
+  //   [&]<size_t... Ks>(std::index_sequence<Ks...>) {
+  //     ( f(std::index_sequence<Ks>{}), ... );
+  //   }(std::index_sequence<I...>{});
+  // };
 };
+
+template <typename> struct var_sentinel;
+template <typename T, size_t... I> struct var_sentinel<var<T,I...>> { };
+
+template <size_t> struct index_constant { };
+
+// template <typename>
+// struct sequence;
+// template <typename T, size_t... I>
+// struct sequence<var<T,I...>> {
+//   using type = std::index_sequence<I...>;
+// };
+// template <typename Var>
+// using sequence_t = typename sequence<Var>::type;
+
+// template <size_t J, typename T>
+// constexpr bool in = false;
+// template <size_t J, size_t... I>
+// constexpr bool in<J,std::index_sequence<I...>> = ( (I == J) || ... );
+// template <size_t J, typename T, size_t... I>
+// constexpr bool in<J,var<T,I...>> = ( (I == J) || ... );
+
+template <size_t J, size_t... I>
+constexpr bool in = ( (I == J) || ... );
+
+template <size_t J, size_t... I>
+constexpr size_t index = in<J,I...> ? ( (I < J) + ... ) : size_t(-1);
+
+template <size_t J, typename T, size_t... I>
+T& d(var<T,I...>& v) requires (in<J,I...>) {
+  return v.d[index<J,I...>];
+}
+template <size_t J, typename T, size_t... I>
+const T& d(const var<T,I...>& v) requires (in<J,I...>) {
+  return v.d[index<J,I...>];
+}
+template <size_t J, typename T, size_t... I>
+T d(const var<T,I...>& v) requires (!in<J,I...>) {
+  return { };
+}
 
 template <typename T>
 var(T) -> var<T>;
@@ -48,11 +83,10 @@ constexpr var<T,I> mkvar(T x) { return { x }; }
 
 // ------------------------------------------------------------------
 
-template <typename A, typename B, size_t... I, size_t... J>
-constexpr auto merge_var_types( var<A,I...>, var<B,J...> ) {
-  using T = std::common_type_t<A,B>;
+template <size_t... I>
+constexpr auto index_set(auto apply) {
   constexpr auto arr_size = []{
-    std::array<size_t,sizeof...(I)+sizeof...(J)> arr { I..., J... };
+    std::array<size_t,sizeof...(I)> arr { I... };
     std::sort( arr.begin(), arr.end() );
     return std::pair(
       arr,
@@ -60,29 +94,36 @@ constexpr auto merge_var_types( var<A,I...>, var<B,J...> ) {
     );
   }();
   return [&]<size_t... K>(std::index_sequence<K...>) {
-    return var< T, arr_size.first[K]... >{};
+    return apply( std::index_sequence< arr_size.first[K]... >{} );
   }(std::make_index_sequence<arr_size.second>{});
 }
 
-template <typename A, typename B>
-constexpr auto merge_var_types( A a, B b ) {
-  return merge_var_types( var(a), var(b) );
-}
-
-template <typename A, typename B>
-using merge_var_t = decltype(merge_var_types(
-  std::declval<A>(),
-  std::declval<B>()
-));
-
-// ------------------------------------------------------------------
-
-template <size_t J, typename T>
-constexpr size_t index = size_t(-1);
-
-template <size_t J, typename T, size_t... I>
-constexpr size_t index<J,var<T,I...>> =
-  ( (I == J) || ... ) ? ( (I < J) + ... ) : size_t(-1);
+// template <typename A, typename B, size_t... I, size_t... J>
+// constexpr auto merge_var_types( var<A,I...>, var<B,J...> ) {
+//   using T = std::common_type_t<A,B>;
+//   constexpr auto arr_size = []{
+//     std::array<size_t,sizeof...(I)+sizeof...(J)> arr { I..., J... };
+//     std::sort( arr.begin(), arr.end() );
+//     return std::pair(
+//       arr,
+//       std::unique( arr.begin(), arr.end() ) - arr.begin()
+//     );
+//   }();
+//   return [&]<size_t... K>(std::index_sequence<K...>) {
+//     return var< T, arr_size.first[K]... >{};
+//   }(std::make_index_sequence<arr_size.second>{});
+// }
+//
+// template <typename A, typename B>
+// constexpr auto merge_var_types( A a, B b ) {
+//   return merge_var_types( var(a), var(b) );
+// }
+//
+// template <typename A, typename B>
+// using merge_var_t = decltype(merge_var_types(
+//   std::declval<A>(),
+//   std::declval<B>()
+// ));
 
 // ------------------------------------------------------------------
 template <typename A, typename B, size_t... I>
@@ -95,15 +136,20 @@ constexpr auto operator+( const A& a, const var<B,J...>& b ) {
 }
 template <typename A, typename B, size_t... I, size_t... J>
 constexpr auto operator+( const var<A,I...>& a, const var<B,J...>& b ) {
-  using result_t = decltype(merge_var_types(a,b));
+  using T = decltype( a.x + b.x );
+  using result_t = decltype(index_set<I...,J...>(
+    []<size_t... K>(std::index_sequence<K...>) {
+      return var<T,K...>{};
+    }
+  ));
   result_t v;
   v.x = a.x + b.x;
-  v.compute_derivatives(
-    [&]<size_t K>(std::index_sequence<K>){
-      if constexpr (a.template has<K>) v.template get<K>() += a.template get<K>();
-      if constexpr (b.template has<K>) v.template get<K>() += b.template get<K>();
-    }
-  );
+  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
+    ([&]<size_t K>(index_constant<K>){
+      if constexpr (in<K,I...>) d<K>(v) += d<K>(a);
+      if constexpr (in<K,J...>) d<K>(v) += d<K>(b);
+    }(index_constant<Ks>{}), ... );
+  }(var_sentinel<decltype(v)>{});
   return v;
 }
 
@@ -117,28 +163,34 @@ constexpr auto operator*( const A& a, const var<B,J...>& b ) {
 }
 template <typename A, typename B, size_t... I, size_t... J>
 constexpr auto operator*( const var<A,I...>& a, const var<B,J...>& b ) {
-  using result_t = decltype(merge_var_types(a,b));
+  using T = decltype( a.x * b.x );
+  using result_t = decltype(index_set<I...,J...>(
+    []<size_t... K>(std::index_sequence<K...>) {
+      return var<T,K...>{};
+    }
+  ));
   result_t v;
   v.x = a.x * b.x;
-  v.compute_derivatives(
-    [&]<size_t K>(std::index_sequence<K>){
-      if constexpr (a.template has<K>) v.template get<K>() += a.template get<K>() * b.x;
-      if constexpr (b.template has<K>) v.template get<K>() += b.template get<K>() * a.x;
-    }
-  );
+  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
+    ([&]<size_t K>(index_constant<K>){
+      if constexpr (in<K,I...>) d<K>(v) += d<K>(a) * b.x;
+      if constexpr (in<K,J...>) d<K>(v) += d<K>(b) * a.x;
+    }(index_constant<Ks>{}), ... );
+  }(var_sentinel<decltype(v)>{});
   return v;
 }
 
 template <typename A, size_t... I>
 constexpr auto log( const var<A,I...>& a ) {
-  var<A,I...> v;
   using std::log;
+  using T = decltype( log(a.x) );
+  var<T,I...> v;
   v.x = log(a.x);
-  v.compute_derivatives(
-    [&]<size_t K>(std::index_sequence<K>){
-      v.template get<K>() += a.template get<K>() / a.x;
-    }
-  );
+  [&]<size_t... Ks>(var_sentinel<var<T,Ks...>>) {
+    ([&]<size_t K>(index_constant<K>){
+      d<K>(v) += d<K>(a) / a.x;
+    }(index_constant<Ks>{}), ... );
+  }(var_sentinel<decltype(v)>{});
   return v;
 }
 

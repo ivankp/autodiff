@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
   var<double,0> x(3);
   var<double,1> y(5);
 
-  TEST( y.template get<1>() )
+  TEST( d<1>(y) )
 
   TEST(x)
   TEST(x.d[0])
