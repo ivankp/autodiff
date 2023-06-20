@@ -21,46 +21,28 @@ struct var {
   : x(x), d{1} { }
 
   explicit constexpr operator T() const { return x; }
-
-  // template <size_t J>
-  // static constexpr bool in = ( (I == J) || ... );
-  //
-  // template <size_t J>
-  // static constexpr size_t index = in<J> ? ( (I < J) + ... ) : size_t(-1);
-
-  // void compute_derivatives(auto&& f) {
-  //   [&]<size_t... Ks>(std::index_sequence<Ks...>) {
-  //     ( f(std::index_sequence<Ks>{}), ... );
-  //   }(std::index_sequence<I...>{});
-  // };
 };
+
+template <typename T>
+var(T) -> var<T>;
+
+template <size_t I, typename T>
+constexpr var<T,I> mkvar(T x) { return { x }; }
+
+// ------------------------------------------------------------------
 
 template <typename> struct var_sentinel;
 template <typename T, size_t... I> struct var_sentinel<var<T,I...>> { };
 
 template <size_t> struct index_constant { };
 
-// template <typename>
-// struct sequence;
-// template <typename T, size_t... I>
-// struct sequence<var<T,I...>> {
-//   using type = std::index_sequence<I...>;
-// };
-// template <typename Var>
-// using sequence_t = typename sequence<Var>::type;
-
-// template <size_t J, typename T>
-// constexpr bool in = false;
-// template <size_t J, size_t... I>
-// constexpr bool in<J,std::index_sequence<I...>> = ( (I == J) || ... );
-// template <size_t J, typename T, size_t... I>
-// constexpr bool in<J,var<T,I...>> = ( (I == J) || ... );
-
 template <size_t J, size_t... I>
 constexpr bool in = ( (I == J) || ... );
 
 template <size_t J, size_t... I>
 constexpr size_t index = in<J,I...> ? ( (I < J) + ... ) : size_t(-1);
+
+// ------------------------------------------------------------------
 
 template <size_t J, typename T, size_t... I>
 T& d(var<T,I...>& v) requires (in<J,I...>) {
@@ -74,12 +56,6 @@ template <size_t J, typename T, size_t... I>
 T d(const var<T,I...>& v) requires (!in<J,I...>) {
   return { };
 }
-
-template <typename T>
-var(T) -> var<T>;
-
-template <size_t I, typename T>
-constexpr var<T,I> mkvar(T x) { return { x }; }
 
 // ------------------------------------------------------------------
 
@@ -97,33 +73,6 @@ constexpr auto index_set(auto apply) {
     return apply( std::index_sequence< arr_size.first[K]... >{} );
   }(std::make_index_sequence<arr_size.second>{});
 }
-
-// template <typename A, typename B, size_t... I, size_t... J>
-// constexpr auto merge_var_types( var<A,I...>, var<B,J...> ) {
-//   using T = std::common_type_t<A,B>;
-//   constexpr auto arr_size = []{
-//     std::array<size_t,sizeof...(I)+sizeof...(J)> arr { I..., J... };
-//     std::sort( arr.begin(), arr.end() );
-//     return std::pair(
-//       arr,
-//       std::unique( arr.begin(), arr.end() ) - arr.begin()
-//     );
-//   }();
-//   return [&]<size_t... K>(std::index_sequence<K...>) {
-//     return var< T, arr_size.first[K]... >{};
-//   }(std::make_index_sequence<arr_size.second>{});
-// }
-//
-// template <typename A, typename B>
-// constexpr auto merge_var_types( A a, B b ) {
-//   return merge_var_types( var(a), var(b) );
-// }
-//
-// template <typename A, typename B>
-// using merge_var_t = decltype(merge_var_types(
-//   std::declval<A>(),
-//   std::declval<B>()
-// ));
 
 // ------------------------------------------------------------------
 template <typename A, typename B, size_t... I>

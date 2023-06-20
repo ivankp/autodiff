@@ -4,8 +4,6 @@ using std::cout, std::endl;
 #include "autodiff.hh"
 using ivan::autodiff::var;
 using ivan::autodiff::mkvar;
-// using ivan::autodiff::merge_var_t;
-// using ivan::autodiff::index;
 
 #include "debug.hh"
 
