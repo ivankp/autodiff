@@ -3,11 +3,23 @@
 
 #include <array>
 #include <utility>
-// #include <type_traits>
 #include <algorithm>
 #include <cmath>
 
 namespace ivan::autodiff {
+
+// ------------------------------------------------------------------
+
+template <typename> struct type_constant { };
+template <size_t> struct index_constant { };
+
+template <size_t J, size_t... I>
+constexpr bool in = ( (I == J) || ... );
+
+template <size_t J, size_t... I>
+constexpr size_t index = in<J,I...> ? ( (I < J) + ... ) : size_t(-1);
+
+// ------------------------------------------------------------------
 
 template <typename T, size_t... I>
 struct var {
@@ -25,6 +37,21 @@ struct var {
   template <typename B, size_t... J>
   auto operator<=>(const var<B,J...>& r) const { return x <=> r.x; }
   auto operator<=>(const auto& r) const { return x <=> r; }
+
+  template <size_t J>
+  friend T& d(var& v) requires (in<J,I...>) {
+    return v.d[index<J,I...>];
+  }
+  template <size_t J>
+  friend const T& d(const var& v) requires (in<J,I...>) {
+    return v.d[index<J,I...>];
+  }
+  template <size_t J>
+  friend T d(const var& v) requires (!in<J,I...>) {
+    return { };
+  }
+
+  friend auto& operator<<(auto& o, const var& v) { return o << v.x; }
 };
 
 template <typename T>
@@ -41,6 +68,11 @@ struct var<T> {
   template <typename B, size_t... J>
   auto operator<=>(const var<B,J...>& r) const { return x <=> r.x; }
   auto operator<=>(const auto& r) const { return x <=> r; }
+
+  template <size_t J>
+  friend T d(const var& v) { return { }; }
+
+  friend auto& operator<<(auto& o, const var& v) { return o << v.x; }
 };
 
 template <typename T>
@@ -51,34 +83,8 @@ constexpr var<T,I> mkvar(T x) { return { x }; }
 
 // ------------------------------------------------------------------
 
-template <typename> struct type_constant { };
-template <size_t> struct index_constant { };
-
-template <size_t J, size_t... I>
-constexpr bool in = ( (I == J) || ... );
-
-template <size_t J, size_t... I>
-constexpr size_t index = in<J,I...> ? ( (I < J) + ... ) : size_t(-1);
-
-// ------------------------------------------------------------------
-
-template <size_t J, typename T, size_t... I>
-T& d(var<T,I...>& v) requires (in<J,I...>) {
-  return v.d[index<J,I...>];
-}
-template <size_t J, typename T, size_t... I>
-const T& d(const var<T,I...>& v) requires (in<J,I...>) {
-  return v.d[index<J,I...>];
-}
-template <size_t J, typename T, size_t... I>
-T d(const var<T,I...>& v) requires (!in<J,I...>) {
-  return { };
-}
-
-// ------------------------------------------------------------------
-
 template <size_t... I>
-constexpr auto unique_indices(auto apply) {
+constexpr auto make_unique_index_sequence() {
   constexpr auto arr_size = []{
     std::array<size_t,sizeof...(I)> arr { I... };
     std::sort( arr.begin(), arr.end() );
@@ -88,7 +94,7 @@ constexpr auto unique_indices(auto apply) {
     );
   }();
   return [&]<size_t... K>(std::index_sequence<K...>) {
-    return apply( std::index_sequence< arr_size.first[K]... >{} );
+    return std::index_sequence< arr_size.first[K]... >{};
   }(std::make_index_sequence<arr_size.second>{});
 }
 
@@ -128,11 +134,11 @@ template <
 >
 constexpr auto binary_op( const var<A,I...>& a, const var<B,J...>& b ) {
   using T = decltype( OP::f(a.x,b.x) );
-  using result_t = decltype(unique_indices<I...,J...>(
+  using result_t = decltype(
     []<size_t... K>(std::index_sequence<K...>) {
       return var<T,K...>{};
-    }
-  ));
+    }(make_unique_index_sequence<I...,J...>())
+  );
   result_t v;
   v.x = OP::f(a.x,b.x);
   [&]<size_t... Ks>(type_constant<var<T,Ks...>>) {
@@ -345,9 +351,6 @@ struct binary_pow_impl {
 IVAN_AUTODIFF_MAKE_BINARY_OP(pow,binary_pow_impl)
 
 // ------------------------------------------------------------------
-
-template <typename T, size_t... I>
-auto& operator << (auto& o, const var<T,I...>& v) { return o << v.x; }
 
 }
 

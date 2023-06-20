@@ -107,4 +107,6 @@ int main(int argc, char** argv) {
   TEST( d<0>(abs(mkvar<0>(1.2)*2)) )
 
   TEST( x < var(5) )
+
+  TEST( var(1)+var(2) )
 }
