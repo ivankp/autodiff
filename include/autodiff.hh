@@ -10,7 +10,6 @@ namespace ivan::autodiff {
 
 // ------------------------------------------------------------------
 
-template <typename> struct type_constant { };
 template <size_t> struct index_constant { };
 
 template <size_t J, size_t... I>
@@ -134,19 +133,20 @@ template <
 >
 constexpr auto binary_op( const var<A,I...>& a, const var<B,J...>& b ) {
   using T = decltype( OP::f(a.x,b.x) );
+  using seq = decltype(make_unique_index_sequence<I...,J...>());
   using result_t = decltype(
     []<size_t... K>(std::index_sequence<K...>) {
       return var<T,K...>{};
-    }(make_unique_index_sequence<I...,J...>())
+    }(seq{})
   );
   result_t v;
   v.x = OP::f(a.x,b.x);
-  [&]<size_t... Ks>(type_constant<var<T,Ks...>>) {
+  [&]<size_t... Ks>(std::index_sequence<Ks...>) {
     ([&]<size_t K>(index_constant<K>){
       if constexpr (in<K,I...>) d<K>(v) += OP::template dfda<K>(a,b,v.x);
       if constexpr (in<K,J...>) d<K>(v) += OP::template dfdb<K>(a,b,v.x);
     }(index_constant<Ks>{}), ... );
-  }(type_constant<decltype(v)>{});
+  }(seq{});
   return v;
 }
 
